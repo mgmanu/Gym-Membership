@@ -13,8 +13,16 @@ function MembersTable({
   attendancePage = false,
 }) {
   function getInitials(name) {
+    if (
+      typeof name !== "string" ||
+      name.trim() === ""
+    ) {
+      return "?";
+    }
+
     return name
-      .split(" ")
+      .trim()
+      .split(/\s+/)
       .map((word) => word[0])
       .join("")
       .slice(0, 2)
@@ -22,18 +30,21 @@ function MembersTable({
   }
 
   function formatDate(date) {
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    if (!date) return "-";
+
+    return new Date(date).toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   }
 
   return (
     <div className="table-wrapper">
-
       <table>
-
         <thead>
           <tr>
             <th>MEMBER</th>
@@ -50,134 +61,155 @@ function MembersTable({
         </thead>
 
         <tbody>
-
           {members.length === 0 ? (
-
             <tr>
               <td
-                colSpan={attendancePage ? 6 : 5}
+                colSpan={
+                  attendancePage ? 6 : 5
+                }
                 className="empty-table"
               >
                 No members found.
               </td>
             </tr>
-
           ) : (
+            members.map((member) => {
+              // Supabase database fields
+              const memberName =
+                member.full_name ??
+                member.name ??
+                "Unknown Member";
 
-            members.map((member) => (
+              const phone =
+                member.phone ?? "-";
 
-              <tr key={member.id}>
+              const plan =
+                member.plan_type ??
+                member.plan ??
+                "-";
 
-                <td>
+              const payment =
+                member.payment_status ??
+                member.payment ??
+                "Pending";
 
-                  <div className="table-member">
+              const expiry =
+                member.expiry_date ??
+                member.expiry;
 
-                    <div className="member-avatar">
-                      {getInitials(member.name)}
-                    </div>
-
-                    <div className="member-name">
-                      <strong>{member.name}</strong>
-                      <span>{member.phone}</span>
-                    </div>
-
-                  </div>
-
-                </td>
-
-                <td>
-                  <span className="plan-badge">
-                    {member.plan}
-                  </span>
-                </td>
-
-                <td>
-
-                  <span
-                    className={`status-badge ${
-                      member.payment === "Paid"
-                        ? "active-status"
-                        : "pending-status"
-                    }`}
-                  >
-                    {member.payment}
-                  </span>
-
-                </td>
-
-                <td>
-                  {formatDate(member.expiry)}
-                </td>
-
-                {attendancePage && (
-
+              return (
+                <tr key={member.id}>
+                  {/* MEMBER */}
                   <td>
+                    <div className="table-member">
+                      <div className="member-avatar">
+                        {getInitials(
+                          memberName
+                        )}
+                      </div>
 
-                    {member.attendance ? (
+                      <div className="member-name">
+                        <strong>
+                          {memberName}
+                        </strong>
 
-                      <span className="checkin-done">
-                        <CalendarCheck size={12} />
-                        Checked In
-                      </span>
-
-                    ) : (
-
-                      <button
-                        className="checkin-button"
-                        onClick={() =>
-                          onCheckIn(member.id)
-                        }
-                      >
-                        <CalendarCheck size={12} />
-                        Check In
-                      </button>
-
-                    )}
-
+                        <span>
+                          {phone}
+                        </span>
+                      </div>
+                    </div>
                   </td>
 
-                )}
+                  {/* PLAN */}
+                  <td>
+                    <span className="plan-badge">
+                      {plan}
+                    </span>
+                  </td>
 
-                <td>
-
-                  <div className="action-buttons">
-
-                    <button
-                      className="view-button"
-                      onClick={() =>
-                        onView(member)
-                      }
-                      title="View member"
+                  {/* PAYMENT */}
+                  <td>
+                    <span
+                      className={`status-badge ${
+                        payment === "Paid"
+                          ? "active-status"
+                          : "pending-status"
+                      }`}
                     >
-                      <Eye size={13} />
-                    </button>
+                      {payment}
+                    </span>
+                  </td>
 
-                    {!attendancePage && (
+                  {/* EXPIRY */}
+                  <td>
+                    {formatDate(expiry)}
+                  </td>
+
+                  {/* ATTENDANCE */}
+                  {attendancePage && (
+                    <td>
+                      {member.attendance ? (
+                        <span className="checkin-done">
+                          <CalendarCheck
+                            size={12}
+                          />
+                          Checked In
+                        </span>
+                      ) : (
+                        <button
+                          className="checkin-button"
+                          onClick={() =>
+                            onCheckIn?.(
+                              member.id
+                            )
+                          }
+                          type="button"
+                        >
+                          <CalendarCheck
+                            size={12}
+                          />
+                          Check In
+                        </button>
+                      )}
+                    </td>
+                  )}
+
+                  {/* ACTIONS */}
+                  <td>
+                    <div className="action-buttons">
                       <button
-                        className="delete-button"
+                        className="view-button"
                         onClick={() =>
-                          onDelete(member.id)
+                          onView?.(member)
                         }
-                        title="Delete member"
+                        title="View member"
+                        type="button"
                       >
-                        <Trash2 size={13} />
+                        <Eye size={13} />
                       </button>
-                    )}
 
-                  </div>
-
-                </td>
-
-              </tr>
-
-            ))
-
+                      {!attendancePage && (
+                        <button
+                          className="delete-button"
+                          onClick={() =>
+                            onDelete?.(
+                              member.id
+                            )
+                          }
+                          title="Delete member"
+                          type="button"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
           )}
-
         </tbody>
-
       </table>
-
     </div>
   );
 }

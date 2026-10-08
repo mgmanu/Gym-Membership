@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+
 import {
   LockKeyhole,
   Mail,
@@ -12,15 +13,26 @@ import {
   UserCheck,
 } from "lucide-react";
 
-function LoginPage({ onLogin }) {
+import { useAuth } from "../context/AuthContext";
+
+function LoginPage() {
+  const { signIn } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event) {
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [remember, setRemember] =
+    useState(false);
+
+  const [error, setError] = useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  async function handleSubmit(event) {
     event.preventDefault();
 
     setError("");
@@ -41,33 +53,46 @@ function LoginPage({ onLogin }) {
     }
 
     if (password.length < 6) {
-      setError("Password must contain at least 6 characters.");
+      setError(
+        "Password must contain at least 6 characters."
+      );
       return;
     }
 
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
+    const result = await signIn(
+      email.trim(),
+      password
+    );
 
-      onLogin({
-        email,
-        remember,
-      });
-    }, 700);
+    setLoading(false);
+
+    if (!result.success) {
+      setError(
+        result.error ||
+          "Unable to sign in. Please check your credentials."
+      );
+
+      return;
+    }
+
+    /*
+      Supabase Auth state changes automatically.
+      App.jsx will detect the authenticated user
+      and display DashboardPage.
+    */
   }
 
   function handleForgotPassword() {
     setError(
-      "Password recovery will be connected to Supabase authentication later."
+      "Password recovery will be connected in a later step."
     );
   }
 
   return (
     <div className="login-page">
-
       <section className="login-brand-panel">
-
         <div className="login-brand">
           <div className="login-logo">
             <LockKeyhole size={21} />
@@ -80,7 +105,6 @@ function LoginPage({ onLogin }) {
         </div>
 
         <div className="login-brand-content">
-
           <div className="login-label">
             PRIVATE MANAGEMENT WORKSPACE
           </div>
@@ -98,14 +122,16 @@ function LoginPage({ onLogin }) {
           </p>
 
           <div className="login-features">
-
             <div className="login-feature">
               <div className="feature-icon">
                 <Users size={17} />
               </div>
 
               <div>
-                <strong>Member Management</strong>
+                <strong>
+                  Member Management
+                </strong>
+
                 <span>
                   Register and manage every member
                 </span>
@@ -118,7 +144,10 @@ function LoginPage({ onLogin }) {
               </div>
 
               <div>
-                <strong>Attendance Tracking</strong>
+                <strong>
+                  Attendance Tracking
+                </strong>
+
                 <span>
                   Keep track of daily check-ins
                 </span>
@@ -131,26 +160,26 @@ function LoginPage({ onLogin }) {
               </div>
 
               <div>
-                <strong>Business Overview</strong>
+                <strong>
+                  Business Overview
+                </strong>
+
                 <span>
                   Monitor revenue and membership activity
                 </span>
               </div>
             </div>
-
           </div>
         </div>
 
         <div className="login-copyright">
-          © 2026 Gym Management System · Secure Admin Workspace
+          © 2026 Gym Management System · Secure Admin
+          Workspace
         </div>
-
       </section>
 
       <section className="login-form-side">
-
         <div className="login-card">
-
           <div className="mobile-login-logo">
             <LockKeyhole size={21} />
           </div>
@@ -159,20 +188,18 @@ function LoginPage({ onLogin }) {
             <h1>Welcome Back</h1>
 
             <p>
-              Sign in to access your gym management workspace.
+              Sign in to access your gym management
+              workspace.
             </p>
           </div>
 
           <form onSubmit={handleSubmit}>
-
             <div className="login-form-group">
-
               <label htmlFor="email">
                 Email Address
               </label>
 
               <div className="login-input">
-
                 <Mail size={15} />
 
                 <input
@@ -180,20 +207,17 @@ function LoginPage({ onLogin }) {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
+                  autoComplete="email"
                   onChange={(event) => {
                     setEmail(event.target.value);
                     setError("");
                   }}
                 />
-
               </div>
-
             </div>
 
             <div className="login-form-group">
-
               <div className="password-label">
-
                 <label htmlFor="password">
                   Password
                 </label>
@@ -205,18 +229,21 @@ function LoginPage({ onLogin }) {
                 >
                   Forgot password?
                 </button>
-
               </div>
 
               <div className="login-input">
-
                 <KeyRound size={15} />
 
                 <input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
                   placeholder="Enter your password"
                   value={password}
+                  autoComplete="current-password"
                   onChange={(event) => {
                     setPassword(event.target.value);
                     setError("");
@@ -227,7 +254,14 @@ function LoginPage({ onLogin }) {
                   type="button"
                   className="password-toggle"
                   onClick={() =>
-                    setShowPassword((value) => !value)
+                    setShowPassword(
+                      (value) => !value
+                    )
+                  }
+                  aria-label={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
                   }
                 >
                   {showPassword ? (
@@ -236,27 +270,23 @@ function LoginPage({ onLogin }) {
                     <Eye size={15} />
                   )}
                 </button>
-
               </div>
-
             </div>
 
             <div className="remember-row">
-
               <label className="remember-label">
-
                 <input
                   type="checkbox"
                   checked={remember}
                   onChange={(event) =>
-                    setRemember(event.target.checked)
+                    setRemember(
+                      event.target.checked
+                    )
                   }
                 />
 
                 Remember me
-
               </label>
-
             </div>
 
             {error && (
@@ -274,23 +304,23 @@ function LoginPage({ onLogin }) {
                 <span>Signing in...</span>
               ) : (
                 <>
-                  <span>Enter Dashboard</span>
+                  <span>
+                    Enter Dashboard
+                  </span>
+
                   <ArrowRight size={15} />
                 </>
               )}
             </button>
-
           </form>
 
           <div className="login-security">
             <ShieldCheck size={12} />
+
             Secure administrator access
           </div>
-
         </div>
-
       </section>
-
     </div>
   );
 }

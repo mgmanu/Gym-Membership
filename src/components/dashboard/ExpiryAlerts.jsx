@@ -1,7 +1,7 @@
 import React from "react";
 import {
   ChevronRight,
-  Clock,
+  AlertCircle,
 } from "lucide-react";
 
 function ExpiryAlerts({
@@ -11,6 +11,9 @@ function ExpiryAlerts({
   function getDaysLeft(expiryDate) {
     const today = new Date();
     const expiry = new Date(expiryDate);
+
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
 
     const difference =
       expiry.getTime() - today.getTime();
@@ -32,6 +35,8 @@ function ExpiryAlerts({
   }
 
   function getInitials(name) {
+    if (!name) return "?";
+
     return name
       .split(" ")
       .map((word) => word[0])
@@ -41,10 +46,8 @@ function ExpiryAlerts({
   }
 
   return (
-    <div className="expiry-card">
-
-      <div className="card-header">
-
+    <div className="dashboard-mini-card expiry-dashboard-card">
+      <div className="dashboard-mini-header">
         <div>
           <h3>Expiry Alerts</h3>
 
@@ -53,80 +56,96 @@ function ExpiryAlerts({
           </p>
         </div>
 
-        <div className="alert-count">
+        <div className="expiry-alert-count">
           {members.length}
         </div>
-
       </div>
 
-      <div className="expiry-list">
-
+      <div className="expiry-dashboard-list">
         {members.length === 0 ? (
+          <div className="expiry-dashboard-empty">
+            <div className="expiry-empty-icon">
+              <AlertCircle size={17} />
+            </div>
 
-          <div className="empty-alert">
-            No memberships expiring soon.
+            <strong>
+              No memberships expiring soon.
+            </strong>
+
+            <span>
+              All active memberships are currently
+              in good standing.
+            </span>
           </div>
-
         ) : (
-
           members.slice(0, 4).map((member) => {
+            const days = getDaysLeft(
+              member.expiry_date ?? member.expiry
+            );
 
-            const days =
-              getDaysLeft(member.expiry);
+            const memberName =
+              member.full_name ?? member.name;
 
             return (
               <div
-                className="expiry-item"
+                className="expiry-dashboard-item"
                 key={member.id}
               >
-
-                <div className="member-avatar">
-                  {getInitials(member.name)}
+                <div className="expiry-dashboard-avatar">
+                  {getInitials(memberName)}
                 </div>
 
-                <div className="expiry-info">
-
+                <div className="expiry-dashboard-info">
                   <strong>
-                    {member.name}
+                    {memberName}
                   </strong>
 
                   <span>
                     Expires{" "}
-                    {formatDate(member.expiry)}
+                    {formatDate(
+                      member.expiry_date ??
+                        member.expiry
+                    )}
                   </span>
-
                 </div>
 
-                <span className="days-left">
-
+                <span
+                  className={`expiry-dashboard-days ${
+                    days <= 0
+                      ? "expiry-dashboard-expired"
+                      : days <= 7
+                      ? "expiry-dashboard-warning"
+                      : ""
+                  }`}
+                >
                   {days <= 0
                     ? "Expired"
                     : `${days} days`}
-
                 </span>
 
                 <button
-                  className="view-button"
+                  className="expiry-dashboard-view"
                   onClick={() =>
                     onView(member)
                   }
+                  type="button"
                 >
-                  <ChevronRight size={13} />
+                  <ChevronRight size={14} />
                 </button>
-
               </div>
             );
           })
-
         )}
-
       </div>
 
-      <button className="view-alerts">
-        <Clock size={12} />
+      <button
+        className="expiry-dashboard-footer"
+        type="button"
+      >
         View all expiry alerts
-      </button>
 
+        <ChevronRight size={13} />
+      </button>
     </div>
   );
 }

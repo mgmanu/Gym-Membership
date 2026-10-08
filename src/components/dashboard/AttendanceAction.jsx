@@ -26,10 +26,8 @@ function AttendanceAction({
   ];
 
   return (
-    <div className="attendance-card">
-
-      <div className="card-header">
-
+    <div className="dashboard-mini-card attendance-dashboard-card">
+      <div className="dashboard-mini-header">
         <div>
           <h3>Today's Attendance</h3>
 
@@ -38,38 +36,35 @@ function AttendanceAction({
           </p>
         </div>
 
-        <CalendarCheck size={18} />
-
+        <div className="dashboard-mini-icon">
+          <CalendarCheck size={18} />
+        </div>
       </div>
 
-      <div className="attendance-body">
-
-        <div className="attendance-number">
-
+      <div className="attendance-dashboard-body">
+        <div className="attendance-dashboard-number">
           <span>Checked In</span>
 
           <strong>{attendance}</strong>
 
-          <div className="attendance-growth">
-
+          <div className="attendance-dashboard-growth">
             <TrendingUp size={11} />
 
-            {percentage}% of members
-
+            <span>
+              {percentage}% of members
+            </span>
           </div>
-
         </div>
 
-        <div className="attendance-chart">
-
-          <div className="chart-bars">
-
+        <div className="attendance-dashboard-chart">
+          <div className="attendance-chart-bars">
             {chartData.map((height, index) => (
-
               <div
                 key={index}
-                className={`bar ${
-                  index === 6 ? "current" : ""
+                className={`attendance-chart-bar ${
+                  index === 6
+                    ? "attendance-chart-current"
+                    : ""
                 }`}
                 style={{
                   height: `${Math.max(
@@ -78,12 +73,10 @@ function AttendanceAction({
                   )}%`,
                 }}
               />
-
             ))}
-
           </div>
 
-          <div className="chart-labels">
+          <div className="attendance-chart-labels">
             <span>Mon</span>
             <span>Tue</span>
             <span>Wed</span>
@@ -92,11 +85,8 @@ function AttendanceAction({
             <span>Sat</span>
             <span>Today</span>
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }

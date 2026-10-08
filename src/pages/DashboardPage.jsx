@@ -1,134 +1,78 @@
-import React, { useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
-  Users,
-  UserPlus,
-  CreditCard,
-  CalendarCheck,
-  RefreshCw,
   Bell,
-  Search,
-  LogOut,
-  LayoutDashboard,
+  CalendarDays,
   ChevronRight,
-  TrendingUp,
-  Clock,
-  ShieldCheck,
-  X,
-  Check,
+  CircleDollarSign,
+  Clock3,
+  LogOut,
   Menu,
-  UserRound,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Users,
+  X,
+  Eye,
+  CreditCard,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 import MembersTable from "../components/dashboard/MembersTable";
 import AttendanceAction from "../components/dashboard/AttendanceAction";
 import ExpiryAlerts from "../components/dashboard/ExpiryAlerts";
 
-const initialMembers = [
-  {
-    id: 1,
-    name: "Rahul Sharma",
-    phone: "9876543210",
-    plan: "1 Year",
-    payment: "Paid",
-    expiry: "2027-08-14",
-    joined: "2026-08-14",
-    attendance: false,
-  },
-  {
-    id: 2,
-    name: "Priya Reddy",
-    phone: "9845123456",
-    plan: "3 Months",
-    payment: "Paid",
-    expiry: "2026-11-12",
-    joined: "2026-08-12",
-    attendance: true,
-  },
-  {
-    id: 3,
-    name: "Arjun Kumar",
-    phone: "9988776655",
-    plan: "1 Month",
-    payment: "Pending",
-    expiry: "2026-10-22",
-    joined: "2026-09-22",
-    attendance: false,
-  },
-  {
-    id: 4,
-    name: "Sneha Gowda",
-    phone: "9911223344",
-    plan: "1 Year",
-    payment: "Paid",
-    expiry: "2027-04-03",
-    joined: "2026-04-03",
-    attendance: true,
-  },
-  {
-    id: 5,
-    name: "Vikram Singh",
-    phone: "9765432109",
-    plan: "3 Months",
-    payment: "Paid",
-    expiry: "2026-10-18",
-    joined: "2026-07-18",
-    attendance: false,
-  },
-  {
-    id: 6,
-    name: "Ananya Rao",
-    phone: "9898989898",
-    plan: "1 Year",
-    payment: "Paid",
-    expiry: "2027-01-20",
-    joined: "2026-01-20",
-    attendance: false,
-  },
-];
+import { useAuth } from "../context/AuthContext";
 
-const initialPayments = [
-  {
-    id: 101,
-    member: "Rahul Sharma",
-    amount: 12000,
-    date: "2026-08-14",
-    status: "Paid",
-  },
-  {
-    id: 102,
-    member: "Priya Reddy",
-    amount: 4500,
-    date: "2026-08-12",
-    status: "Paid",
-  },
-  {
-    id: 103,
-    member: "Arjun Kumar",
-    amount: 1800,
-    date: "2026-09-22",
-    status: "Pending",
-  },
-  {
-    id: 104,
-    member: "Sneha Gowda",
-    amount: 12000,
-    date: "2026-04-03",
-    status: "Paid",
-  },
-];
+import {
+  fetchMembers,
+  addMember,
+  deleteMember,
+  renewMember,
+  checkInMember,
+  fetchTodayAttendance,
+  fetchPayments,
+} from "../services/gymOperations";
 
-function DashboardPage({ onLogout }) {
+import {
+  getDaysLeft,
+  formatDate,
+} from "../utils/dateHelpers";
+
+import { supabase } from "../services/supabaseClient";
+
+function DashboardPage({ onLogout, user }) {
+  const { user: authUser } = useAuth();
+
+  const currentUser = user || authUser;
+
   const [activePage, setActivePage] =
     useState("Dashboard");
 
-  const [members, setMembers] =
-    useState(initialMembers);
+  const [members, setMembers] = useState([]);
+
+  const [attendance, setAttendance] =
+    useState([]);
 
   const [payments, setPayments] =
-    useState(initialPayments);
+    useState([]);
 
-  const [search, setSearch] = useState("");
+  const [membersLoading, setMembersLoading] =
+    useState(true);
+
+  const [attendanceLoading, setAttendanceLoading] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
 
   const [selectedMember, setSelectedMember] =
     useState(null);
@@ -139,402 +83,1310 @@ function DashboardPage({ onLogout }) {
   const [showNotifications, setShowNotifications] =
     useState(false);
 
-  const [showMobileMenu, setShowMobileMenu] =
+  const [mobileMenu, setMobileMenu] =
     useState(false);
 
-  const [notification, setNotification] =
+  const [toast, setToast] =
     useState("");
 
-  const [newMember, setNewMember] = useState({
-    name: "",
-    phone: "",
-    plan: "",
-    payment: "Paid",
-  });
-
-  const [attendance, setAttendance] =
-    useState(
-      initialMembers.filter(
-        (member) => member.attendance
-      ).length
-    );
-
-  const today = new Date();
-
-  function formatDate(dateString) {
-    return new Date(
-      dateString
-    ).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  }
-
-  function showMessage(message) {
-    setNotification(message);
-
-    setTimeout(() => {
-      setNotification("");
-    }, 2500);
-  }
-
-  const activeMembers = members.filter(
-    (member) =>
-      new Date(member.expiry) >= today
-  ).length;
-
-  const pendingPayments = payments.filter(
-    (payment) =>
-      payment.status === "Pending"
-  ).length;
-
-  const totalRevenue = payments
-    .filter(
-      (payment) =>
-        payment.status === "Paid"
-    )
-    .reduce(
-      (sum, payment) =>
-        sum + payment.amount,
-      0
-    );
-
-  const expiryMembers = members.filter(
-    (member) => {
-      const expiry =
-        new Date(member.expiry);
-
-      const difference =
-        (expiry.getTime() -
-          today.getTime()) /
-        (1000 * 60 * 60 * 24);
-
-      return difference <= 30;
-    }
-  );
-
-  const filteredMembers = useMemo(() => {
-    return members.filter((member) =>
-      `${member.name} ${member.phone} ${member.plan}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
-  }, [members, search]);
-
-  function handleNavigation(page) {
-    setActivePage(page);
-    setShowMobileMenu(false);
-    setShowNotifications(false);
-  }
-
-  function handleDeleteMember(id) {
-    const member = members.find(
-      (item) => item.id === id
-    );
-
-    if (!member) return;
-
-    const confirmed = window.confirm(
-      `Delete ${member.name}?`
-    );
-
-    if (!confirmed) return;
-
-    setMembers((current) =>
-      current.filter(
-        (item) => item.id !== id
-      )
-    );
-
-    setPayments((current) =>
-      current.filter(
-        (payment) =>
-          payment.member !== member.name
-      )
-    );
-
-    if (
-      selectedMember?.id === id
-    ) {
-      setSelectedMember(null);
-    }
-
-    showMessage(
-      `${member.name} removed successfully.`
-    );
-  }
-
-  function handleCheckIn(id) {
-    const member = members.find(
-      (item) => item.id === id
-    );
-
-    if (!member) return;
-
-    if (member.attendance) {
-      showMessage(
-        `${member.name} is already checked in.`
-      );
-      return;
-    }
-
-    setMembers((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              attendance: true,
-            }
-          : item
-      )
-    );
-
-    setAttendance(
-      (current) => current + 1
-    );
-
-    showMessage(
-      `${member.name} checked in successfully.`
-    );
-  }
-
-  function handleRegister(event) {
-    event.preventDefault();
-
-    if (
-      !newMember.name.trim() ||
-      !newMember.phone.trim() ||
-      !newMember.plan
-    ) {
-      showMessage(
-        "Please fill all required fields."
-      );
-      return;
-    }
-
-    const planMonths = {
-      "1 Month": 1,
-      "3 Months": 3,
-      "1 Year": 12,
-    };
-
-    const planPrice = {
-      "1 Month": 1800,
-      "3 Months": 4500,
-      "1 Year": 12000,
-    };
-
-    const expiry = new Date();
-
-    expiry.setMonth(
-      expiry.getMonth() +
-        planMonths[newMember.plan]
-    );
-
-    const member = {
-      id: Date.now(),
-      name: newMember.name.trim(),
-      phone: newMember.phone.trim(),
-      plan: newMember.plan,
-      payment: newMember.payment,
-      expiry: expiry
-        .toISOString()
-        .split("T")[0],
-      joined: new Date()
-        .toISOString()
-        .split("T")[0],
-      attendance: false,
-    };
-
-    setMembers((current) => [
-      member,
-      ...current,
-    ]);
-
-    if (
-      newMember.payment === "Paid"
-    ) {
-      setPayments((current) => [
-        {
-          id: Date.now(),
-          member: member.name,
-          amount:
-            planPrice[newMember.plan],
-          date: new Date()
-            .toISOString()
-            .split("T")[0],
-          status: "Paid",
-        },
-        ...current,
-      ]);
-    }
-
-    setNewMember({
-      name: "",
+  const [newMember, setNewMember] =
+    useState({
+      fullName: "",
       phone: "",
-      plan: "",
-      payment: "Paid",
+      planType: "1 Month",
+      paymentStatus: "Paid",
     });
-
-    setShowRegister(false);
-
-    showMessage(
-      `${member.name} registered successfully.`
-    );
-  }
-
-  function handleRenew(member) {
-    const months = {
-      "1 Month": 1,
-      "3 Months": 3,
-      "1 Year": 12,
-    };
-
-    const newExpiry = new Date();
-
-    newExpiry.setMonth(
-      newExpiry.getMonth() + 1
-    );
-
-    setMembers((current) =>
-      current.map((item) =>
-        item.id === member.id
-          ? {
-              ...item,
-              plan: "1 Month",
-              expiry: newExpiry
-                .toISOString()
-                .split("T")[0],
-              payment: "Paid",
-            }
-          : item
-      )
-    );
-
-    setPayments((current) => [
-      {
-        id: Date.now(),
-        member: member.name,
-        amount: 1800,
-        date: new Date()
-          .toISOString()
-          .split("T")[0],
-        status: "Paid",
-      },
-      ...current,
-    ]);
-
-    showMessage(
-      `${member.name}'s membership renewed.`
-    );
-  }
 
   const menuItems = [
     {
-      name: "Dashboard",
-      icon: <LayoutDashboard size={16} />,
+      label: "Dashboard",
+      icon: <CalendarDays size={17} />,
     },
     {
-      name: "Members",
-      icon: <Users size={16} />,
+      label: "Members",
+      icon: <Users size={17} />,
     },
     {
-      name: "Attendance",
-      icon: <CalendarCheck size={16} />,
+      label: "Attendance",
+      icon: <UserCheck size={17} />,
     },
     {
-      name: "Payments",
-      icon: <CreditCard size={16} />,
+      label: "Payments",
+      icon: <CreditCard size={17} />,
     },
     {
-      name: "Renewals",
-      icon: <RefreshCw size={16} />,
+      label: "Renewals",
+      icon: <RefreshCw size={17} />,
     },
   ];
 
-  return (
-    <div className="app">
+  function showToast(message) {
+    setToast(message);
 
-      {/* NAVBAR */}
+    setTimeout(() => {
+      setToast("");
+    }, 3000);
+  }
 
-      <header className="navbar">
+  // ==========================================
+  // LOAD MEMBERS
+  // ==========================================
 
-        <div className="brand">
+  async function loadMembers() {
+    if (!currentUser?.id) return;
 
-          <div className="brand-logo">
-            <ShieldCheck size={20} />
+    try {
+      setMembersLoading(true);
+
+      const data =
+        await fetchMembers(currentUser.id);
+
+      setMembers(data);
+    } catch (error) {
+      console.error(
+        "Unable to load members:",
+        error
+      );
+
+      showToast(
+        "Unable to load members from Supabase."
+      );
+    } finally {
+      setMembersLoading(false);
+    }
+  }
+
+  // ==========================================
+  // LOAD ATTENDANCE
+  // ==========================================
+
+  async function loadAttendance() {
+    if (!currentUser?.id) return;
+
+    try {
+      setAttendanceLoading(true);
+
+      const data =
+        await fetchTodayAttendance(
+          currentUser.id
+        );
+
+      setAttendance(data);
+    } catch (error) {
+      console.error(
+        "Unable to load attendance:",
+        error
+      );
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }
+
+  // ==========================================
+  // LOAD PAYMENTS
+  // ==========================================
+
+  async function loadPayments() {
+    if (!currentUser?.id) return;
+
+    try {
+      const data =
+        await fetchPayments(currentUser.id);
+
+      setPayments(data);
+    } catch (error) {
+      console.error(
+        "Unable to load payments:",
+        error
+      );
+    }
+  }
+
+  // ==========================================
+  // INITIAL DATA LOAD
+  // ==========================================
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    loadMembers();
+    loadAttendance();
+    loadPayments();
+  }, [currentUser?.id]);
+
+  // ==========================================
+  // SUPABASE REALTIME
+  // ==========================================
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    console.log(
+      "Starting Supabase realtime..."
+    );
+
+    const membersChannel =
+      supabase
+        .channel(
+          `gym-members-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "gym_members",
+            filter: `user_id=eq.${currentUser.id}`,
+          },
+          async (payload) => {
+            console.log(
+              "Realtime member change:",
+              payload
+            );
+
+            await loadMembers();
+          }
+        )
+        .subscribe((status) => {
+          console.log(
+            "Members realtime status:",
+            status
+          );
+        });
+
+    const paymentsChannel =
+      supabase
+        .channel(
+          `gym-payments-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "payments",
+            filter: `user_id=eq.${currentUser.id}`,
+          },
+          async (payload) => {
+            console.log(
+              "Realtime payment change:",
+              payload
+            );
+
+            await loadPayments();
+          }
+        )
+        .subscribe((status) => {
+          console.log(
+            "Payments realtime status:",
+            status
+          );
+        });
+
+    const attendanceChannel =
+      supabase
+        .channel(
+          `gym-attendance-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "attendance",
+          },
+          async (payload) => {
+            console.log(
+              "Realtime attendance change:",
+              payload
+            );
+
+            await loadAttendance();
+          }
+        )
+        .subscribe((status) => {
+          console.log(
+            "Attendance realtime status:",
+            status
+          );
+        });
+
+    return () => {
+      console.log(
+        "Stopping Supabase realtime..."
+      );
+
+      supabase.removeChannel(
+        membersChannel
+      );
+
+      supabase.removeChannel(
+        paymentsChannel
+      );
+
+      supabase.removeChannel(
+        attendanceChannel
+      );
+    };
+  }, [currentUser?.id]);
+
+  // ==========================================
+  // ADD MEMBER
+  // ==========================================
+
+  async function handleAddMember(event) {
+    event?.preventDefault();
+
+    if (!newMember.fullName.trim()) {
+      showToast(
+        "Please enter the member name."
+      );
+      return;
+    }
+
+    if (!newMember.phone.trim()) {
+      showToast(
+        "Please enter the phone number."
+      );
+      return;
+    }
+
+    if (
+      !/^[0-9]{10}$/.test(
+        newMember.phone
+      )
+    ) {
+      showToast(
+        "Please enter a valid 10-digit phone number."
+      );
+      return;
+    }
+
+    try {
+      const createdMember =
+        await addMember(
+          currentUser.id,
+          newMember
+        );
+
+      setMembers((current) => [
+        createdMember,
+        ...current,
+      ]);
+
+      setShowRegister(false);
+
+      setNewMember({
+        fullName: "",
+        phone: "",
+        planType: "1 Month",
+        paymentStatus: "Paid",
+      });
+
+      await loadPayments();
+
+      showToast(
+        "Member registered successfully."
+      );
+    } catch (error) {
+      console.error(error);
+
+      showToast(
+        "Unable to register member."
+      );
+    }
+  }
+
+  // ==========================================
+  // DELETE MEMBER
+  // ==========================================
+
+  async function handleDeleteMember(
+    memberId
+  ) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this member?"
+      );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteMember(memberId);
+
+      setMembers((current) =>
+        current.filter(
+          (member) =>
+            member.id !== memberId
+        )
+      );
+
+      if (
+        selectedMember?.id === memberId
+      ) {
+        setSelectedMember(null);
+      }
+
+      await loadPayments();
+
+      showToast(
+        "Member deleted successfully."
+      );
+    } catch (error) {
+      console.error(error);
+
+      showToast(
+        "Unable to delete member."
+      );
+    }
+  }
+
+  // ==========================================
+  // CHECK IN
+  // ==========================================
+
+  async function handleCheckIn(
+    memberId
+  ) {
+    try {
+      await checkInMember(memberId);
+
+      showToast(
+        "Member checked in successfully."
+      );
+
+      await loadAttendance();
+    } catch (error) {
+      console.error(error);
+
+      showToast(
+        "Unable to record attendance."
+      );
+    }
+  }
+
+  // ==========================================
+  // RENEW MEMBER
+  // ==========================================
+
+  async function handleRenew(member) {
+    try {
+      const updatedMember =
+        await renewMember(
+          member.id,
+          member.plan_type,
+          currentUser.id
+        );
+
+      setMembers((current) =>
+        current.map((item) =>
+          item.id === updatedMember.id
+            ? updatedMember
+            : item
+        )
+      );
+
+      setSelectedMember(
+        updatedMember
+      );
+
+      await loadPayments();
+
+      showToast(
+        `${member.full_name}'s membership renewed.`
+      );
+    } catch (error) {
+      console.error(error);
+
+      showToast(
+        "Unable to renew membership."
+      );
+    }
+  }
+
+  // ==========================================
+  // FILTER MEMBERS
+  // ==========================================
+
+  const filteredMembers = useMemo(() => {
+    const value =
+      search.trim().toLowerCase();
+
+    if (!value) return members;
+
+    return members.filter((member) => {
+      return (
+        member.full_name
+          ?.toLowerCase()
+          .includes(value) ||
+        member.phone
+          ?.toLowerCase()
+          .includes(value) ||
+        member.plan_type
+          ?.toLowerCase()
+          .includes(value)
+      );
+    });
+  }, [members, search]);
+
+  // ==========================================
+  // STATISTICS
+  // ==========================================
+
+  const totalMembers =
+    members.length;
+
+  const activeMembers =
+    members.filter((member) => {
+      if (!member.expiry_date)
+        return false;
+
+      return (
+        getDaysLeft(
+          member.expiry_date
+        ) >= 0
+      );
+    }).length;
+
+  const expiringMembers =
+    members.filter((member) => {
+      if (!member.expiry_date)
+        return false;
+
+      const days =
+        getDaysLeft(
+          member.expiry_date
+        );
+
+      return (
+        days >= 0 &&
+        days <= 30
+      );
+    }).length;
+
+  const pendingPayments =
+    members.filter(
+      (member) =>
+        member.payment_status ===
+        "Pending"
+    ).length;
+
+  const totalRevenue =
+    payments.reduce(
+      (total, payment) => {
+        if (
+          payment.payment_status ===
+          "Paid"
+        ) {
+          return (
+            total +
+            Number(payment.amount)
+          );
+        }
+
+        return total;
+      },
+      0
+    );
+
+  // ==========================================
+  // EXPIRING MEMBERS
+  // ==========================================
+
+  const expiryMembers =
+    members
+      .filter((member) => {
+        const days =
+          getDaysLeft(
+            member.expiry_date
+          );
+
+        return (
+          days >= 0 &&
+          days <= 30
+        );
+      })
+      .sort(
+        (a, b) =>
+          getDaysLeft(
+            a.expiry_date
+          ) -
+          getDaysLeft(
+            b.expiry_date
+          )
+      );
+
+  // ==========================================
+  // RECENT MEMBERS
+  // ==========================================
+
+  const recentMembers =
+    [...members]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at) -
+          new Date(a.created_at)
+      )
+      .slice(0, 5);
+
+  // ==========================================
+  // PAGE NAVIGATION
+  // ==========================================
+
+  function navigate(page) {
+    setActivePage(page);
+    setMobileMenu(false);
+    setSearch("");
+  }
+
+  // ==========================================
+  // DASHBOARD
+  // ==========================================
+
+  function renderDashboard() {
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="breadcrumb">
+              Home
+              <ChevronRight size={12} />
+              Dashboard
+            </div>
+
+            <h1>Dashboard</h1>
+
+            <p>
+              Welcome back, Admin. Here's
+              what's happening at your gym
+              today.
+            </p>
           </div>
 
-          <div className="brand-text">
-            <h2>Gym Management</h2>
-            <span>ADMIN PORTAL</span>
-          </div>
+          <div className="date-badge">
+            <CalendarDays size={14} />
 
+            {new Date().toLocaleDateString(
+              "en-IN",
+              {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }
+            )}
+          </div>
         </div>
 
-        <button
-          className="mobile-menu-button"
-          onClick={() =>
-            setShowMobileMenu(
-              (value) => !value
-            )
-          }
-        >
-          <Menu size={20} />
-        </button>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">
+              <Users size={18} />
+            </div>
 
-        <div className="navbar-right">
+            <span className="stat-label">
+              TOTAL MEMBERS
+            </span>
+
+            <strong>
+              {totalMembers}
+            </strong>
+
+            <small>
+              Members registered
+            </small>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <UserCheck size={18} />
+            </div>
+
+            <span className="stat-label">
+              ACTIVE MEMBERS
+            </span>
+
+            <strong>
+              {activeMembers}
+            </strong>
+
+            <small>
+              Currently active
+            </small>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <CircleDollarSign size={18} />
+            </div>
+
+            <span className="stat-label">
+              REVENUE
+            </span>
+
+            <strong>
+              ₹
+              {totalRevenue.toLocaleString(
+                "en-IN"
+              )}
+            </strong>
+
+            <small>
+              Total paid revenue
+            </small>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <Clock3 size={18} />
+            </div>
+
+            <span className="stat-label">
+              EXPIRING SOON
+            </span>
+
+            <strong>
+              {expiringMembers}
+            </strong>
+
+            <small>
+              Next 30 days
+            </small>
+          </div>
+        </div>
+
+        <div className="dashboard-two-column">
+          <AttendanceAction
+            members={members}
+            attendance={attendance.length}
+          />
+
+          <ExpiryAlerts
+            members={expiryMembers}
+            onView={setSelectedMember}
+          />
+        </div>
+
+        <div className="dashboard-section-card">
+          <div className="section-card-header">
+            <div>
+              <h2>
+                Recent Members
+              </h2>
+
+              <p>
+                Latest members registered
+                in your gym
+              </p>
+            </div>
+
+            <button
+              className="secondary-button"
+              onClick={() =>
+                navigate("Members")
+              }
+            >
+              View All
+            </button>
+          </div>
+
+          {membersLoading ? (
+            <div className="empty-table">
+              Loading members...
+            </div>
+          ) : recentMembers.length === 0 ? (
+            <div className="empty-table">
+              <Users size={28} />
+
+              <strong>
+                No members yet
+              </strong>
+
+              <span>
+                Register your first member
+                to get started.
+              </span>
+
+              <button
+                className="primary-button"
+                onClick={() =>
+                  setShowRegister(true)
+                }
+              >
+                <Plus size={15} />
+                Add Member
+              </button>
+            </div>
+          ) : (
+            <MembersTable
+              members={recentMembers}
+              onDelete={
+                handleDeleteMember
+              }
+              onView={
+                setSelectedMember
+              }
+              onCheckIn={
+                handleCheckIn
+              }
+            />
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ==========================================
+  // MEMBERS PAGE
+  // ==========================================
+
+  function renderMembers() {
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="breadcrumb">
+              Home
+              <ChevronRight size={12} />
+              Members
+            </div>
+
+            <h1>Members</h1>
+
+            <p>
+              Manage all registered gym
+              members.
+            </p>
+          </div>
 
           <button
-            className="nav-icon"
+            className="primary-button"
+            onClick={() =>
+              setShowRegister(true)
+            }
+          >
+            <UserPlus size={16} />
+            Add Member
+          </button>
+        </div>
+
+        <div className="toolbar-card">
+          <div className="search-box">
+            <Search size={16} />
+
+            <input
+              type="text"
+              placeholder="Search members..."
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+            />
+
+            {search && (
+              <button
+                onClick={() =>
+                  setSearch("")
+                }
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="member-count">
+            {filteredMembers.length} members
+          </div>
+        </div>
+
+        <div className="dashboard-section-card">
+          {membersLoading ? (
+            <div className="empty-table">
+              Loading members...
+            </div>
+          ) : (
+            <MembersTable
+              members={filteredMembers}
+              onDelete={
+                handleDeleteMember
+              }
+              onView={
+                setSelectedMember
+              }
+              onCheckIn={
+                handleCheckIn
+              }
+            />
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ==========================================
+  // ATTENDANCE PAGE
+  // ==========================================
+
+  function renderAttendance() {
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="breadcrumb">
+              Home
+              <ChevronRight size={12} />
+              Attendance
+            </div>
+
+            <h1>Attendance</h1>
+
+            <p>
+              Track today's member
+              check-ins.
+            </p>
+          </div>
+        </div>
+
+        <AttendanceAction
+          members={members}
+          attendance={attendance.length}
+        />
+
+        <div className="dashboard-section-card">
+          <div className="section-card-header">
+            <div>
+              <h2>
+                Today's Check-ins
+              </h2>
+
+              <p>
+                Members who checked in
+                today
+              </p>
+            </div>
+
+            <span className="member-count">
+              {attendance.length} check-ins
+            </span>
+          </div>
+
+          {attendanceLoading ? (
+            <div className="empty-table">
+              Loading attendance...
+            </div>
+          ) : attendance.length === 0 ? (
+            <div className="empty-table">
+              <UserCheck size={28} />
+
+              <strong>
+                No check-ins today
+              </strong>
+
+              <span>
+                Check in members from the
+                Members page.
+              </span>
+            </div>
+          ) : (
+            <div className="attendance-list">
+              {attendance.map((item) => (
+                <div
+                  className="attendance-row"
+                  key={item.id}
+                >
+                  <div className="member-avatar">
+                    {item.gym_members?.full_name
+                      ?.charAt(0)
+                      ?.toUpperCase()}
+                  </div>
+
+                  <div className="attendance-member">
+                    <strong>
+                      {
+                        item.gym_members
+                          ?.full_name
+                      }
+                    </strong>
+
+                    <span>
+                      {
+                        item.gym_members
+                          ?.phone
+                      }
+                    </span>
+                  </div>
+
+                  <span>
+                    {new Date(
+                      item.created_at
+                    ).toLocaleTimeString(
+                      "en-IN",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )}
+                  </span>
+
+                  <CheckCircle2 size={18} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ==========================================
+  // PAYMENTS PAGE
+  // ==========================================
+
+  function renderPayments() {
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="breadcrumb">
+              Home
+              <ChevronRight size={12} />
+              Payments
+            </div>
+
+            <h1>Payments</h1>
+
+            <p>
+              Track all registration and
+              renewal payments.
+            </p>
+          </div>
+        </div>
+
+        <div className="dashboard-section-card">
+          <div className="section-card-header">
+            <div>
+              <h2>
+                Payment History
+              </h2>
+
+              <p>
+                Today's and previous
+                payment records
+              </p>
+            </div>
+
+            <strong>
+              ₹
+              {totalRevenue.toLocaleString(
+                "en-IN"
+              )}
+            </strong>
+          </div>
+
+          {payments.length === 0 ? (
+            <div className="empty-table">
+              <CircleDollarSign size={28} />
+
+              <strong>
+                No payments yet
+              </strong>
+
+              <span>
+                Payment records will
+                appear here when members
+                register or renew.
+              </span>
+            </div>
+          ) : (
+            <div className="attendance-list">
+              {payments.map((payment) => (
+                <div
+                  className="attendance-row"
+                  key={payment.id}
+                >
+                  <div className="member-avatar">
+                    {payment.gym_members
+                      ?.full_name
+                      ?.charAt(0)
+                      ?.toUpperCase() ||
+                      "?"}
+                  </div>
+
+                  <div className="attendance-member">
+                    <strong>
+                      {payment.gym_members
+                        ?.full_name ||
+                        "Unknown Member"}
+                    </strong>
+
+                    <span>
+                      {payment.gym_members
+                        ?.phone ||
+                        "No phone number"}
+                    </span>
+                  </div>
+
+                  <span>
+                    {payment.payment_type}
+                  </span>
+
+                  <span>
+                    {new Date(
+                      payment.created_at
+                    ).toLocaleDateString(
+                      "en-IN",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      }
+                    )}
+                  </span>
+
+                  <strong>
+                    ₹
+                    {Number(
+                      payment.amount
+                    ).toLocaleString(
+                      "en-IN"
+                    )}
+                  </strong>
+
+                  <span className="payment-status">
+                    {payment.payment_status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ==========================================
+  // RENEWALS PAGE
+  // ==========================================
+
+  function renderRenewals() {
+    const renewalMembers =
+      members.filter(
+        (member) =>
+          getDaysLeft(
+            member.expiry_date
+          ) <= 30
+      );
+
+    return (
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="breadcrumb">
+              Home
+              <ChevronRight size={12} />
+              Renewals
+            </div>
+
+            <h1>Renewals</h1>
+
+            <p>
+              Manage upcoming membership
+              renewals.
+            </p>
+          </div>
+        </div>
+
+        <div className="dashboard-section-card">
+          {renewalMembers.length === 0 ? (
+            <div className="empty-table">
+              <RefreshCw size={30} />
+
+              <strong>
+                No renewals required
+              </strong>
+
+              <span>
+                There are no memberships
+                expiring within 30 days.
+              </span>
+            </div>
+          ) : (
+            <div className="renewal-list">
+              {renewalMembers.map(
+                (member) => {
+                  const days =
+                    getDaysLeft(
+                      member.expiry_date
+                    );
+
+                  return (
+                    <div
+                      className="renewal-row"
+                      key={member.id}
+                    >
+                      <div className="member-avatar">
+                        {member.full_name
+                          ?.charAt(0)
+                          ?.toUpperCase()}
+                      </div>
+
+                      <div>
+                        <strong>
+                          {member.full_name}
+                        </strong>
+
+                        <span>
+                          Expires{" "}
+                          {formatDate(
+                            member.expiry_date
+                          )}
+                        </span>
+                      </div>
+
+                      <span>
+                        {days < 0
+                          ? "Expired"
+                          : `${days} days left`}
+                      </span>
+
+                      <button
+                        className="primary-button small"
+                        onClick={() =>
+                          handleRenew(
+                            member
+                          )
+                        }
+                      >
+                        Renew
+                      </button>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ==========================================
+  // PAGE SELECTOR
+  // ==========================================
+
+  function renderPage() {
+    switch (activePage) {
+      case "Members":
+        return renderMembers();
+
+      case "Attendance":
+        return renderAttendance();
+
+      case "Payments":
+        return renderPayments();
+
+      case "Renewals":
+        return renderRenewals();
+
+      default:
+        return renderDashboard();
+    }
+  }
+
+  return (
+    <div className="dashboard-page">
+
+      {/* HEADER */}
+
+      <header className="dashboard-header">
+        <div className="dashboard-brand">
+          <div className="dashboard-logo">
+            <AlertCircle size={19} />
+          </div>
+
+          <div>
+            <h2>
+              Gym Management
+            </h2>
+
+            <span>
+              ADMIN PORTAL
+            </span>
+          </div>
+        </div>
+
+        <div className="header-actions">
+          <button
+            className="icon-button"
             onClick={() =>
               setShowNotifications(
                 (value) => !value
               )
             }
           >
-            <Bell size={17} />
+            <Bell size={18} />
 
-            {expiryMembers.length > 0 && (
-              <span className="notification-dot" />
+            {expiringMembers > 0 && (
+              <span className="notification-dot">
+                {expiringMembers}
+              </span>
             )}
           </button>
 
           <div className="profile">
-
             <div className="profile-avatar">
-              M
+              {currentUser?.email
+                ?.charAt(0)
+                ?.toUpperCase() || "A"}
             </div>
 
-            <div className="profile-details">
-              <strong>Manish</strong>
-              <span>Administrator</span>
-            </div>
+            <div>
+              <strong>
+                {currentUser?.email
+                  ?.split("@")[0] ||
+                  "Admin"}
+              </strong>
 
+              <span>
+                Administrator
+              </span>
+            </div>
           </div>
 
           <button
-            className="nav-icon"
+            className="logout-button"
             onClick={onLogout}
             title="Logout"
           >
-            <LogOut size={16} />
+            <LogOut size={17} />
           </button>
 
+          <button
+            className="mobile-menu-button"
+            onClick={() =>
+              setMobileMenu(
+                (value) => !value
+              )
+            }
+          >
+            {mobileMenu ? (
+              <X size={20} />
+            ) : (
+              <Menu size={20} />
+            )}
+          </button>
         </div>
-
       </header>
 
-      {/* NOTIFICATION PANEL */}
+      {/* NOTIFICATIONS */}
 
       {showNotifications && (
-
         <div className="notification-panel">
-
           <div className="notification-header">
-
-            <strong>Notifications</strong>
+            <strong>
+              Notifications
+            </strong>
 
             <button
               onClick={() =>
@@ -543,836 +1395,154 @@ function DashboardPage({ onLogout }) {
             >
               <X size={15} />
             </button>
-
           </div>
 
           {expiryMembers.length === 0 ? (
+            <div className="notification-empty">
+              <CheckCircle2 size={20} />
 
-            <p>No expiry alerts.</p>
-
+              <span>
+                No expiry alerts.
+              </span>
+            </div>
           ) : (
+            expiryMembers
+              .slice(0, 5)
+              .map((member) => (
+                <button
+                  className="notification-item"
+                  key={member.id}
+                  onClick={() => {
+                    setSelectedMember(
+                      member
+                    );
 
-            expiryMembers.map((member) => (
+                    setShowNotifications(
+                      false
+                    );
+                  }}
+                >
+                  <AlertCircle size={16} />
 
-              <button
-                className="notification-item"
-                key={member.id}
-                onClick={() => {
-                  setSelectedMember(member);
-                  setShowNotifications(false);
-                }}
-              >
-                <strong>{member.name}</strong>
+                  <div>
+                    <strong>
+                      {member.full_name}
+                    </strong>
 
-                <span>
-                  Membership expires on{" "}
-                  {formatDate(member.expiry)}
-                </span>
-              </button>
-
-            ))
-
+                    <span>
+                      Expires{" "}
+                      {formatDate(
+                        member.expiry_date
+                      )}
+                    </span>
+                  </div>
+                </button>
+              ))
           )}
-
         </div>
-
       )}
 
-      <div className="layout">
+      <div className="dashboard-layout">
 
         {/* SIDEBAR */}
 
         <aside
-          className={`sidebar ${
-            showMobileMenu
-              ? "sidebar-open"
+          className={`dashboard-sidebar ${
+            mobileMenu
+              ? "mobile-open"
               : ""
           }`}
         >
-
-          <div className="menu-heading">
-            MAIN MENU
-          </div>
-
-          <nav>
+          <div className="sidebar-menu">
+            <span className="sidebar-label">
+              MAIN MENU
+            </span>
 
             {menuItems.map((item) => (
-
               <button
-                key={item.name}
-                className={`menu-item ${
-                  activePage === item.name
+                key={item.label}
+                className={`sidebar-item ${
+                  activePage === item.label
                     ? "active"
                     : ""
                 }`}
                 onClick={() =>
-                  handleNavigation(
-                    item.name
-                  )
+                  navigate(item.label)
                 }
               >
                 {item.icon}
-                <span>{item.name}</span>
+
+                <span>
+                  {item.label}
+                </span>
               </button>
-
             ))}
-
-          </nav>
+          </div>
 
           <div className="sidebar-bottom">
-
             <div className="gym-status">
-
-              <span className="status-dot" />
+              <span className="status-dot"></span>
 
               <div>
-                <strong>Gym is Open</strong>
+                <strong>
+                  Gym is Open
+                </strong>
+
                 <span>
-                  06:00 AM - 10:00 PM
+                  06:00 AM – 10:00 PM
                 </span>
               </div>
-
             </div>
 
             <button
               className="sidebar-logout"
               onClick={onLogout}
             >
-              <LogOut size={13} />
+              <LogOut size={14} />
               Logout
             </button>
 
-            <div className="sidebar-version">
+            <small>
               Gym Management System
               <br />
               Version 1.0
-            </div>
-
+            </small>
           </div>
-
         </aside>
 
-        {/* MAIN */}
+        {/* MAIN CONTENT */}
 
-        <main className="main">
-
-          {notification && (
-
-            <div className="toast">
-
-              <Check size={15} />
-
-              {notification}
-
-            </div>
-
-          )}
-
-          {/* PAGE HEADER */}
-
-          <div className="page-header">
-
-            <div>
-
-              <div className="breadcrumb">
-                <span>Home</span>
-                <ChevronRight size={10} />
-                <strong>{activePage}</strong>
-              </div>
-
-              <h1>{activePage}</h1>
-
-              <p>
-                {activePage === "Dashboard"
-                  ? "Welcome back, Admin. Here's what's happening at your gym today."
-                  : `Manage your gym's ${activePage.toLowerCase()} from one place.`}
-              </p>
-
-            </div>
-
-            <button className="date-button">
-              <Clock size={13} />
-
-              {today.toLocaleDateString(
-                "en-IN",
-                {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                }
-              )}
-            </button>
-
-          </div>
-
-          {/* DASHBOARD */}
-
-          {activePage === "Dashboard" && (
-
-            <>
-
-              <div className="stats-grid">
-
-                <div className="stat-card">
-
-                  <div className="stat-top">
-
-                    <div className="stat-icon">
-                      <Users size={18} />
-                    </div>
-
-                    <TrendingUp size={13} />
-
-                  </div>
-
-                  <div className="stat-content">
-
-                    <span className="stat-title">
-                      Total Members
-                    </span>
-
-                    <h2>
-                      {members.length}
-                    </h2>
-
-                    <div className="stat-footer">
-                      <span className="up">
-                        +12%
-                      </span>
-                      <span>
-                        this month
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                <div className="stat-card">
-
-                  <div className="stat-top">
-
-                    <div className="stat-icon">
-                      <UserRound size={18} />
-                    </div>
-
-                  </div>
-
-                  <div className="stat-content">
-
-                    <span className="stat-title">
-                      Active Members
-                    </span>
-
-                    <h2>
-                      {activeMembers}
-                    </h2>
-
-                    <div className="stat-footer">
-                      <span className="up">
-                        {members.length
-                          ? Math.round(
-                              (activeMembers /
-                                members.length) *
-                                100
-                            )
-                          : 0}
-                        %
-                      </span>
-
-                      <span>
-                        of total
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                <div className="stat-card">
-
-                  <div className="stat-top">
-
-                    <div className="stat-icon">
-                      <CreditCard size={18} />
-                    </div>
-
-                  </div>
-
-                  <div className="stat-content">
-
-                    <span className="stat-title">
-                      Revenue
-                    </span>
-
-                    <h2>
-                      ₹
-                      {totalRevenue.toLocaleString(
-                        "en-IN"
-                      )}
-                    </h2>
-
-                    <div className="stat-footer">
-                      <span className="up">
-                        +8.4%
-                      </span>
-
-                      <span>
-                        this month
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                <div className="stat-card">
-
-                  <div className="stat-top">
-
-                    <div className="stat-icon">
-                      <Clock size={18} />
-                    </div>
-
-                  </div>
-
-                  <div className="stat-content">
-
-                    <span className="stat-title">
-                      Expiring Soon
-                    </span>
-
-                    <h2>
-                      {expiryMembers.length}
-                    </h2>
-
-                    <div className="stat-footer">
-                      <span className="attention">
-                        Attention
-                      </span>
-
-                      <span>
-                        required
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-              <div className="middle-grid">
-
-                <AttendanceAction
-                  members={members}
-                  attendance={attendance}
-                />
-
-                <ExpiryAlerts
-                  members={expiryMembers}
-                  onView={setSelectedMember}
-                />
-
-              </div>
-
-              <div className="table-card">
-
-                <div className="card-header">
-
-                  <div>
-                    <h3>
-                      Recent Members
-                    </h3>
-
-                    <p>
-                      Latest members registered
-                      in your gym
-                    </p>
-                  </div>
-
-                  <button
-                    className="small-button"
-                    onClick={() =>
-                      handleNavigation(
-                        "Members"
-                      )
-                    }
-                  >
-                    View All
-                  </button>
-
-                </div>
-
-                <MembersTable
-                  members={members.slice(0, 5)}
-                  onDelete={
-                    handleDeleteMember
-                  }
-                  onView={
-                    setSelectedMember
-                  }
-                  onCheckIn={
-                    handleCheckIn
-                  }
-                />
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* MEMBERS */}
-
-          {activePage === "Members" && (
-
-            <>
-
-              <div className="member-stats">
-
-                <div className="member-stat">
-
-                  <div className="member-stat-icon">
-                    <Users size={18} />
-                  </div>
-
-                  <div>
-                    <span>
-                      Total Members
-                    </span>
-
-                    <strong>
-                      {members.length}
-                    </strong>
-                  </div>
-
-                </div>
-
-                <div className="member-stat">
-
-                  <div className="member-stat-icon">
-                    <ShieldCheck size={18} />
-                  </div>
-
-                  <div>
-                    <span>Active</span>
-
-                    <strong>
-                      {activeMembers}
-                    </strong>
-                  </div>
-
-                </div>
-
-                <div className="member-stat">
-
-                  <div className="member-stat-icon">
-                    <Clock size={18} />
-                  </div>
-
-                  <div>
-                    <span>
-                      Expiring Soon
-                    </span>
-
-                    <strong>
-                      {expiryMembers.length}
-                    </strong>
-                  </div>
-
-                </div>
-
-              </div>
-
-              <div className="table-card">
-
-                <div className="members-toolbar">
-
-                  <div>
-                    <h3>All Members</h3>
-
-                    <p>
-                      Search and manage your
-                      members
-                    </p>
-                  </div>
-
-                  <div className="member-filters">
-
-                    <div className="member-search">
-
-                      <Search size={14} />
-
-                      <input
-                        value={search}
-                        onChange={(event) =>
-                          setSearch(
-                            event.target.value
-                          )
-                        }
-                        placeholder="Search members..."
-                      />
-
-                    </div>
-
-                    <button
-                      className="register-button"
-                      onClick={() =>
-                        setShowRegister(true)
-                      }
-                    >
-                      <UserPlus size={13} />
-                      Add Member
-                    </button>
-
-                  </div>
-
-                </div>
-
-                <MembersTable
-                  members={filteredMembers}
-                  onDelete={
-                    handleDeleteMember
-                  }
-                  onView={
-                    setSelectedMember
-                  }
-                  onCheckIn={
-                    handleCheckIn
-                  }
-                />
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* ATTENDANCE */}
-
-          {activePage === "Attendance" && (
-
-            <div className="table-card">
-
-              <div className="card-header">
-
-                <div>
-                  <h3>
-                    Today's Attendance
-                  </h3>
-
-                  <p>
-                    {attendance} members
-                    checked in today
-                  </p>
-                </div>
-
-                <CalendarCheck size={19} />
-
-              </div>
-
-              <MembersTable
-                members={members}
-                attendancePage={true}
-                onCheckIn={
-                  handleCheckIn
-                }
-                onView={
-                  setSelectedMember
-                }
-              />
-
-            </div>
-
-          )}
-
-          {/* PAYMENTS */}
-
-          {activePage === "Payments" && (
-
-            <>
-
-              <div className="payment-stats">
-
-                <div className="payment-stat">
-
-                  <div className="payment-icon">
-                    <CreditCard size={18} />
-                  </div>
-
-                  <span>
-                    Total Revenue
-                  </span>
-
-                  <strong>
-                    ₹
-                    {totalRevenue.toLocaleString(
-                      "en-IN"
-                    )}
-                  </strong>
-
-                  <small>
-                    +8.4% this month
-                  </small>
-
-                </div>
-
-                <div className="payment-stat">
-
-                  <div className="payment-icon">
-                    <Check size={18} />
-                  </div>
-
-                  <span>
-                    Paid Transactions
-                  </span>
-
-                  <strong>
-                    {
-                      payments.filter(
-                        (payment) =>
-                          payment.status ===
-                          "Paid"
-                      ).length
-                    }
-                  </strong>
-
-                </div>
-
-                <div className="payment-stat">
-
-                  <div className="payment-icon">
-                    <Clock size={18} />
-                  </div>
-
-                  <span>
-                    Pending
-                  </span>
-
-                  <strong>
-                    {pendingPayments}
-                  </strong>
-
-                </div>
-
-              </div>
-
-              <div className="table-card">
-
-                <div className="card-header">
-
-                  <div>
-                    <h3>
-                      Payment History
-                    </h3>
-
-                    <p>
-                      Recent membership
-                      payments
-                    </p>
-                  </div>
-
-                </div>
-
-                <div className="table-wrapper">
-
-                  <table>
-
-                    <thead>
-                      <tr>
-                        <th>MEMBER</th>
-                        <th>AMOUNT</th>
-                        <th>DATE</th>
-                        <th>STATUS</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-
-                      {payments.map(
-                        (payment) => (
-
-                          <tr
-                            key={
-                              payment.id
-                            }
-                          >
-
-                            <td>
-                              {payment.member}
-                            </td>
-
-                            <td>
-                              ₹
-                              {payment.amount.toLocaleString(
-                                "en-IN"
-                              )}
-                            </td>
-
-                            <td>
-                              {formatDate(
-                                payment.date
-                              )}
-                            </td>
-
-                            <td>
-
-                              <span
-                                className={`status-badge ${
-                                  payment.status ===
-                                  "Paid"
-                                    ? "active-status"
-                                    : "pending-status"
-                                }`}
-                              >
-                                {
-                                  payment.status
-                                }
-                              </span>
-
-                            </td>
-
-                          </tr>
-
-                        )
-                      )}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* RENEWALS */}
-
-          {activePage === "Renewals" && (
-
-            <div className="renewal-grid">
-
-              {expiryMembers.length === 0 ? (
-
-                <div className="empty-page">
-                  No memberships require renewal.
-                </div>
-
-              ) : (
-
-                expiryMembers.map(
-                  (member) => (
-
-                    <div
-                      className="renewal-card"
-                      key={member.id}
-                    >
-
-                      <div className="renewal-card-top">
-
-                        <div className="table-member">
-
-                          <div className="member-avatar">
-                            {member.name
-                              .split(" ")
-                              .map(
-                                (word) =>
-                                  word[0]
-                              )
-                              .join("")
-                              .slice(0, 2)}
-                          </div>
-
-                          <div className="member-name">
-
-                            <strong>
-                              {member.name}
-                            </strong>
-
-                            <span>
-                              {member.plan}
-                            </span>
-
-                          </div>
-
-                        </div>
-
-                        <span className="renewal-warning">
-                          Expiring Soon
-                        </span>
-
-                      </div>
-
-                      <div className="renewal-details">
-
-                        <div>
-                          <span>
-                            Current Expiry
-                          </span>
-
-                          <strong>
-                            {formatDate(
-                              member.expiry
-                            )}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <span>
-                            Phone
-                          </span>
-
-                          <strong>
-                            {member.phone}
-                          </strong>
-                        </div>
-
-                      </div>
-
-                      <button
-                        className="renew-button"
-                        onClick={() =>
-                          handleRenew(
-                            member
-                          )
-                        }
-                      >
-                        <RefreshCw size={13} />
-                        Renew Membership
-                      </button>
-
-                    </div>
-
-                  )
-                )
-
-              )}
-
-            </div>
-
-          )}
-
+        <main className="dashboard-main">
+          {renderPage()}
         </main>
-
       </div>
 
-      {/* REGISTER MODAL */}
+      {/* REGISTER MEMBER MODAL */}
 
       {showRegister && (
-
-        <div className="modal-overlay">
-
-          <div className="member-modal">
-
+        <div
+          className="modal-overlay"
+          onClick={() =>
+            setShowRegister(false)
+          }
+        >
+          <div
+            className="modal-card"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
             <div className="modal-header">
+              <div>
+                <h2>
+                  Register New Member
+                </h2>
 
-              <h2>
-                Register New Member
-              </h2>
+                <p>
+                  Add a new member to your
+                  gym.
+                </p>
+              </div>
 
               <button
                 className="modal-close"
@@ -1380,77 +1550,84 @@ function DashboardPage({ onLogout }) {
                   setShowRegister(false)
                 }
               >
-                <X size={15} />
+                <X size={18} />
               </button>
-
             </div>
 
             <form
-              onSubmit={handleRegister}
+              onSubmit={handleAddMember}
             >
+              <div className="form-group">
+                <label>
+                  Full Name
+                </label>
 
-              <div className="modal-form">
-
-                <div className="form-group">
-
-                  <label>
-                    Full Name
-                  </label>
-
-                  <input
-                    value={newMember.name}
-                    onChange={(event) =>
-                      setNewMember({
-                        ...newMember,
-                        name:
+                <input
+                  type="text"
+                  placeholder="Enter full name"
+                  value={
+                    newMember.fullName
+                  }
+                  onChange={(event) =>
+                    setNewMember(
+                      (current) => ({
+                        ...current,
+                        fullName:
                           event.target.value,
                       })
-                    }
-                    placeholder="Enter full name"
-                  />
+                    )
+                  }
+                />
+              </div>
 
-                </div>
+              <div className="form-group">
+                <label>
+                  Phone Number
+                </label>
 
-                <div className="form-group">
-
-                  <label>
-                    Phone Number
-                  </label>
-
-                  <input
-                    value={newMember.phone}
-                    onChange={(event) =>
-                      setNewMember({
-                        ...newMember,
+                <input
+                  type="tel"
+                  placeholder="10-digit phone number"
+                  maxLength={10}
+                  value={
+                    newMember.phone
+                  }
+                  onChange={(event) =>
+                    setNewMember(
+                      (current) => ({
+                        ...current,
                         phone:
-                          event.target.value,
+                          event.target.value.replace(
+                            /\D/g,
+                            ""
+                          ),
                       })
-                    }
-                    placeholder="Enter phone number"
-                  />
+                    )
+                  }
+                />
+              </div>
 
-                </div>
-
+              <div className="form-row">
                 <div className="form-group">
-
                   <label>
                     Membership Plan
                   </label>
 
                   <select
-                    value={newMember.plan}
+                    value={
+                      newMember.planType
+                    }
                     onChange={(event) =>
-                      setNewMember({
-                        ...newMember,
-                        plan:
-                          event.target.value,
-                      })
+                      setNewMember(
+                        (current) => ({
+                          ...current,
+                          planType:
+                            event.target
+                              .value,
+                        })
+                      )
                     }
                   >
-                    <option value="">
-                      Select plan
-                    </option>
-
                     <option value="1 Month">
                       1 Month
                     </option>
@@ -1462,27 +1639,27 @@ function DashboardPage({ onLogout }) {
                     <option value="1 Year">
                       1 Year
                     </option>
-
                   </select>
-
                 </div>
 
                 <div className="form-group">
-
                   <label>
                     Payment Status
                   </label>
 
                   <select
                     value={
-                      newMember.payment
+                      newMember.paymentStatus
                     }
                     onChange={(event) =>
-                      setNewMember({
-                        ...newMember,
-                        payment:
-                          event.target.value,
-                      })
+                      setNewMember(
+                        (current) => ({
+                          ...current,
+                          paymentStatus:
+                            event.target
+                              .value,
+                        })
+                      )
                     }
                   >
                     <option value="Paid">
@@ -1492,18 +1669,14 @@ function DashboardPage({ onLogout }) {
                     <option value="Pending">
                       Pending
                     </option>
-
                   </select>
-
                 </div>
-
               </div>
 
-              <div className="form-actions">
-
+              <div className="modal-actions">
                 <button
                   type="button"
-                  className="cancel-button"
+                  className="secondary-button"
                   onClick={() =>
                     setShowRegister(false)
                   }
@@ -1513,35 +1686,42 @@ function DashboardPage({ onLogout }) {
 
                 <button
                   type="submit"
-                  className="register-button"
+                  className="primary-button"
                 >
-                  <UserPlus size={13} />
+                  <Plus size={15} />
                   Register Member
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
 
       {/* MEMBER DETAILS MODAL */}
 
       {selectedMember && (
-
-        <div className="modal-overlay">
-
-          <div className="member-modal">
-
+        <div
+          className="modal-overlay"
+          onClick={() =>
+            setSelectedMember(null)
+          }
+        >
+          <div
+            className="modal-card member-detail-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
             <div className="modal-header">
+              <div>
+                <h2>
+                  Member Details
+                </h2>
 
-              <h2>
-                Member Details
-              </h2>
+                <p>
+                  Membership information
+                </p>
+              </div>
 
               <button
                 className="modal-close"
@@ -1549,90 +1729,117 @@ function DashboardPage({ onLogout }) {
                   setSelectedMember(null)
                 }
               >
-                <X size={15} />
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="member-detail-top">
+              <div className="large-member-avatar">
+                {selectedMember.full_name
+                  ?.charAt(0)
+                  ?.toUpperCase()}
+              </div>
+
+              <div>
+                <h3>
+                  {selectedMember.full_name}
+                </h3>
+
+                <span>
+                  {selectedMember.phone}
+                </span>
+              </div>
+            </div>
+
+            <div className="member-detail-grid">
+              <div>
+                <span>PLAN</span>
+
+                <strong>
+                  {selectedMember.plan_type}
+                </strong>
+              </div>
+
+              <div>
+                <span>PAYMENT</span>
+
+                <strong>
+                  {
+                    selectedMember.payment_status
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>EXPIRY</span>
+
+                <strong>
+                  {formatDate(
+                    selectedMember.expiry_date
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>DAYS LEFT</span>
+
+                <strong>
+                  {getDaysLeft(
+                    selectedMember.expiry_date
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  handleCheckIn(
+                    selectedMember.id
+                  )
+                }
+              >
+                <UserCheck size={15} />
+                Check In
               </button>
 
-            </div>
-
-            <div className="modal-profile">
-
-              <div className="large-avatar">
-
-                {selectedMember.name
-                  .split(" ")
-                  .map(
-                    (word) => word[0]
+              <button
+                className="primary-button"
+                onClick={() =>
+                  handleRenew(
+                    selectedMember
                   )
-                  .join("")
-                  .slice(0, 2)}
+                }
+              >
+                <RefreshCw size={15} />
+                Renew
+              </button>
 
-              </div>
-
-              <h3>
-                {selectedMember.name}
-              </h3>
-
-              <span>
-                {selectedMember.phone}
-              </span>
-
+              <button
+                className="danger-button"
+                onClick={() =>
+                  handleDeleteMember(
+                    selectedMember.id
+                  )
+                }
+              >
+                <Trash2 size={15} />
+                Delete
+              </button>
             </div>
-
-            <div className="member-details-grid">
-
-              <div>
-                <span>Plan</span>
-
-                <strong>
-                  {selectedMember.plan}
-                </strong>
-              </div>
-
-              <div>
-                <span>Payment</span>
-
-                <strong>
-                  {selectedMember.payment}
-                </strong>
-              </div>
-
-              <div>
-                <span>Joined</span>
-
-                <strong>
-                  {formatDate(
-                    selectedMember.joined
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Expiry</span>
-
-                <strong>
-                  {formatDate(
-                    selectedMember.expiry
-                  )}
-                </strong>
-              </div>
-
-            </div>
-
-            <button
-              className="register-button modal-button"
-              onClick={() =>
-                setSelectedMember(null)
-              }
-            >
-              Close
-            </button>
-
           </div>
-
         </div>
-
       )}
 
+      {/* TOAST */}
+
+      {toast && (
+        <div className="toast">
+          <CheckCircle2 size={16} />
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
